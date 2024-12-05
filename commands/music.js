@@ -1,7 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, NoSubscriberBehavior, getVoiceConnection } = require('@discordjs/voice');
-const ytdl = require('ytdl-core');
-const { getInfo } = require('ytdl-core');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, NoSubscriberBehavior, getVoiceConnection, AudioPlayerStatus } = require('@discordjs/voice');
+const ytdlDiscord = require('ytdl-core-discord');
 const Youtube = require('youtube-search-api');
 
 module.exports = {
@@ -25,7 +24,7 @@ module.exports = {
 
         try {
             let url = query;
-            let isUrl = ytdl.validateURL(query);
+            let isUrl = /^(https?:\/\/)?(www\.youtube\.com|youtu\.be)\//.test(query);
 
             if (!isUrl) {
                 const searchResults = await Youtube.GetListByKeyword(query, false, 1);
@@ -35,11 +34,12 @@ module.exports = {
                 url = `https://www.youtube.com/watch?v=${searchResults.items[0].id}`;
             }
 
-            if (!ytdl.validateURL(url)) {
+            const isValid = await ytdlDiscord.validateURL(url);
+            if (!isValid) {
                 return interaction.editReply({ content: 'The provided URL is not a valid YouTube video.' });
             }
 
-            const videoInfo = await getInfo(url);
+            const videoInfo = await ytdlDiscord.getBasicInfo(url);
             const title = videoInfo.videoDetails.title;
 
             const voiceChannel = member.voice.channel;
@@ -53,9 +53,9 @@ module.exports = {
                 });
             }
 
-            const stream = ytdl(url, { filter: 'audioonly', highWaterMark: 1 << 25 });
+            const stream = await ytdlDiscord(url, { filter: 'audioonly', highWaterMark: 1 << 25 });
 
-            const resource = createAudioResource(stream);
+            const resource = createAudioResource(stream, { inputType: stream.type });
             let player = interaction.client.subscriptions.get(voiceChannel.guild.id);
 
             if (!player) {
@@ -67,6 +67,11 @@ module.exports = {
 
                 player.on('error', error => {
                     console.error('Audio Player Error:', error.message);
+                });
+
+                player.on(AudioPlayerStatus.Idle, () => {
+                    connection.destroy();
+                    interaction.client.subscriptions.delete(voiceChannel.guild.id);
                 });
 
                 connection.subscribe(player);
