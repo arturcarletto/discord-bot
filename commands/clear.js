@@ -12,7 +12,6 @@ module.exports = {
     async execute(interaction) {
         const amount = interaction.options.getInteger('amount');
 
-        // Check for manage messages permission
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
             return interaction.reply({ content: 'You do not have permission to delete messages.', ephemeral: true });
         }

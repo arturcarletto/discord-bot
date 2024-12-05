@@ -5,9 +5,7 @@ const fs = require('fs');
 const commands = [];
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 
-// Application ID and Guild ID
 const clientId = '1246129247207030916';
-// Replace with your Guild ID where you want to deploy the commands
 const guildId = '565542956564480000';
 
 for (const file of commandFiles) {
@@ -22,7 +20,6 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
         console.log('Started refreshing application (/) commands.');
 
         await rest.put(
-            // For guild-specific commands
             Routes.applicationGuildCommands(clientId, guildId),
             { body: commands },
         );
