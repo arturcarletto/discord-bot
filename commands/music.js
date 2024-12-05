@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionsBitField } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, NoSubscriberBehavior, getVoiceConnection } = require('@discordjs/voice');
 const ytdl = require('ytdl-core');
 const Youtube = require('youtube-search-api');
@@ -56,7 +56,7 @@ module.exports = {
         const stream = ytdl(url, { filter: 'audioonly', highWaterMark: 1 << 25 });
 
         const resource = createAudioResource(stream);
-        let player = client.subscriptions.get(voiceChannel.guild.id);
+        let player = interaction.client.subscriptions.get(voiceChannel.guild.id);
 
         if (!player) {
             player = createAudioPlayer({
@@ -70,7 +70,7 @@ module.exports = {
             });
 
             connection.subscribe(player);
-            client.subscriptions.set(voiceChannel.guild.id, player);
+            interaction.client.subscriptions.set(voiceChannel.guild.id, player);
         }
 
         player.play(resource);
