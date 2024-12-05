@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
+const cron = require('node-cron');
 const fs = require('fs');
 const path = require('path');
 const { Sequelize } = require('sequelize');
@@ -235,4 +236,25 @@ client.on('messageReactionRemove', async (reaction, user) => {
             console.log(`Removed role ${role.name} from ${member.user.tag} for reaction ${emoji}.`);
         }
     }
+});
+
+/*CRON FOR BIRTHDAY*/
+
+cron.schedule('0 9 * * *', () => { // Every day at 9:00 AM
+    const today = new Date().toISOString().slice(0, 10); // Format: YYYY-MM-DD
+    const birthdays = fs.existsSync(birthdaysFilePath) ? JSON.parse(fs.readFileSync(birthdaysFilePath, 'utf8')) : {};
+
+    // Iterate over birthdays and check for matches
+    Object.entries(birthdays).forEach(([userId, data]) => {
+        if (data.date === today) {
+            const channel = client.channels.cache.get('YOUR_CHANNEL_ID'); // Replace with your Discord channel ID
+            if (channel) {
+                const customMessage = birthdays['customMessage'] || '🎉 Happy Birthday, {user}! 🎂';
+                const birthdayMessage = customMessage.replace('{user}', `<@${userId}>`);
+                channel.send(birthdayMessage);
+            } else {
+                console.error('Channel not found. Check YOUR_CHANNEL_ID.');
+            }
+        }
+    });
 });
