@@ -12,6 +12,8 @@ module.exports = {
 - \`/stopirritatingnoise <@mention>\`: Stops the irritating noise for a member.
 - \`/music <link or search>\`: Plays music from YouTube based on a link or search query.
 - \`/stopmusic\`: Stops the music and leaves the voice channel.
+- \`/roulette\`: Starts a roulette game where a random participant wins.
+- \`/radmin\`: Displays the Radmin server name and password.
     `;
 
         await interaction.reply({ content: helpMessage, ephemeral: true });
