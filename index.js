@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
 const fs = require('fs');
+const path = require('path');
 const { Sequelize } = require('sequelize');
 
 const client = new Client({
@@ -10,12 +11,22 @@ const client = new Client({
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMessageReactions,
     ],
 });
 
 client.commands = new Collection();
 client.torture = new Map();
 client.subscriptions = new Map();
+
+const rolesFilePath = path.resolve(__dirname, './roles.json');
+
+function loadRolesConfig() {
+    if (fs.existsSync(rolesFilePath)) {
+        return JSON.parse(fs.readFileSync(rolesFilePath, 'utf8'));
+    }
+    return {};
+}
 
 const sequelize = new Sequelize({
     dialect: 'sqlite',
@@ -139,7 +150,6 @@ async function announceLevelUp(member, level, client) {
             });
         }
 
-        // Assign role to member
         await member.roles.add(role);
     }
 }
@@ -180,6 +190,49 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 
             user.lastVoiceTimestamp = null;
             await user.save();
+        }
+    }
+});
+
+client.on('messageReactionAdd', async (reaction, user) => {
+    console.log('Reaction added:', reaction.emoji.name, 'by', user.tag);
+    if (user.bot) return;
+
+    const rolesData = loadRolesConfig();
+    console.log('Roles data loaded:', rolesData);
+
+    const messageId = reaction.message.id;
+    const emoji = reaction.emoji.name;
+
+    if (rolesData[messageId] && rolesData[messageId][emoji]) {
+        const roleId = rolesData[messageId][emoji];
+        const guild = reaction.message.guild;
+        const member = guild.members.cache.get(user.id);
+        const role = guild.roles.cache.get(roleId);
+
+        if (role && member) {
+            await member.roles.add(role);
+            console.log(`Assigned role ${role.name} to ${member.user.tag} for reaction ${emoji}.`);
+        }
+    }
+});
+
+client.on('messageReactionRemove', async (reaction, user) => {
+    if (user.bot) return;
+
+    const rolesData = loadRolesConfig();
+    const messageId = reaction.message.id;
+    const emoji = reaction.emoji.name;
+
+    if (rolesData[messageId] && rolesData[messageId][emoji]) {
+        const roleId = rolesData[messageId][emoji];
+        const guild = reaction.message.guild;
+        const member = guild.members.cache.get(user.id);
+        const role = guild.roles.cache.get(roleId);
+
+        if (role && member) {
+            await member.roles.remove(role);
+            console.log(`Removed role ${role.name} from ${member.user.tag} for reaction ${emoji}.`);
         }
     }
 });
