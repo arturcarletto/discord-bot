@@ -1,6 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
 
-// Temporary storage for ongoing tortures (this should ideally use a database)
 const ongoingTortures = [
     { user: 'User1', tortureType: 'Looping Music', startTime: '2024-12-05 12:00:00' },
     { user: 'User2', tortureType: 'Annoying Pings', startTime: '2024-12-05 12:30:00' }
