@@ -8,7 +8,10 @@ module.exports = {
         const helpMessage = `
 **Available Commands:**
 - \`/clear <amount>\`: Deletes a specified number of messages.
-- \`/help\`: Displays this help message.
+- \`/irritatingnoise <@mention>\`: Tortures a member by switching them between two voice channels every second.
+- \`/stopirritatingnoise <@mention>\`: Stops the irritating noise for a member.
+- \`/music <link or search>\`: Plays music from YouTube based on a link or search query.
+- \`/stopmusic\`: Stops the music and leaves the voice channel.
     `;
 
         await interaction.reply({ content: helpMessage, ephemeral: true });
