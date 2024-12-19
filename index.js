@@ -21,6 +21,7 @@ client.torture = new Map();
 client.subscriptions = new Map();
 
 const rolesFilePath = path.resolve(__dirname, './roles.json');
+const birthdaysFilePath = path.resolve(__dirname, '../birthdays.json');
 
 function loadRolesConfig() {
     if (fs.existsSync(rolesFilePath)) {
@@ -184,6 +185,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
             user.xp += xpGain;
 
             const xpNeeded = calculateXPNeeded(user.level + 1);
+
             if (user.xp >= xpNeeded) {
                 user.level += 1;
                 announceLevelUp(member, user.level, client);
@@ -240,14 +242,13 @@ client.on('messageReactionRemove', async (reaction, user) => {
 
 /*CRON FOR BIRTHDAY*/
 
-cron.schedule('0 9 * * *', () => { // Every day at 9:00 AM
-    const today = new Date().toISOString().slice(0, 10); // Format: YYYY-MM-DD
+cron.schedule('0 9 * * *', () => {
+    const today = new Date().toISOString().slice(0, 10);
     const birthdays = fs.existsSync(birthdaysFilePath) ? JSON.parse(fs.readFileSync(birthdaysFilePath, 'utf8')) : {};
 
-    // Iterate over birthdays and check for matches
     Object.entries(birthdays).forEach(([userId, data]) => {
         if (data.date === today) {
-            const channel = client.channels.cache.get('YOUR_CHANNEL_ID'); // Replace with your Discord channel ID
+            const channel = client.channels.cache.get('729770439576125450');
             if (channel) {
                 const customMessage = birthdays['customMessage'] || '🎉 Happy Birthday, {user}! 🎂';
                 const birthdayMessage = customMessage.replace('{user}', `<@${userId}>`);

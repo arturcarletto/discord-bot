@@ -43,8 +43,7 @@ module.exports = {
             });
         }
 
-
-const xpNeeded = calculateXPNeeded(user.level + 1);
+        const xpNeeded = calculateXPNeeded(user.level + 1);
 
         const embed = new EmbedBuilder()
             .setTitle(`${targetUser.username}'s Rank`)
