@@ -83,119 +83,95 @@ client.login(process.env.TOKEN);
 
 /* MESSAGE XP */
 
-const cooldowns = new Map();
-
-client.on('messageCreate', async (message) => {
-    if (message.author.bot || !message.guild) return;
-
-    const { User } = client.models;
+client.on('messageCreate', (message) => {
+    if (!message.guild || message.author.bot) return;
     const userId = message.author.id;
-    const guildId = message.guild.id;
-
-    const cooldownKey = `${userId}-${guildId}`;
-    if (cooldowns.has(cooldownKey)) return;
-
-    cooldowns.set(cooldownKey, true);
-    setTimeout(() => cooldowns.delete(cooldownKey), 60000); // 60 seconds
-
-    let user = await User.findOne({ where: { userId, guildId } });
-
-    if (!user) {
-        user = await User.create({ userId, guildId });
-    }
-
-    const xpGain = Math.floor(Math.random() * 10) + 15;
-    user.xp += xpGain;
-
-    const xpNeeded = calculateXPNeeded(user.level + 1);
-    if (user.xp >= xpNeeded) {
-        user.level += 1;
-        announceLevelUp(message.member, user.level, client);
-    }
-
-    await user.save();
+    const serverId = message.guild.id;
+    incrementMessageCount(userId, serverId);
 });
 
-function calculateXPNeeded(level) {
-    return 5 * (level ** 2) + 50 * level + 100;
-}
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isCommand() || interaction.commandName !== 'rank') return;
 
-const { EmbedBuilder } = require('discord.js');
+    const userId = interaction.user.id;
+    const serverId = interaction.guild.id;
+    const userRank = await getUserRank(userId, serverId);
+    const userStats = await getUserStats(userId, serverId);
 
-async function announceLevelUp(member, level, client) {
-    const rankChannelId = '1277105343205212170';
-    const rankChannel = member.guild.channels.cache.get(rankChannelId);
+    await interaction.reply({
+        embeds: [
+            {
+                title: `Your Rank`,
+                description: `Here are your current stats:`,
+                fields: [
+                    { name: 'Rank', value: `#${userRank}`, inline: true },
+                    { name: 'Call Time', value: `${formatTime(userStats.callTime)}`, inline: true },
+                    { name: 'Messages Sent', value: `${userStats.messageCount}`, inline: true },
+                ],
+                thumbnail: { url: interaction.user.displayAvatarURL() },
+            },
+        ],
+    });
+});
 
-    if (!rankChannel) return;
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isCommand() || interaction.commandName !== 'ranktop') return;
 
-    const embed = new EmbedBuilder()
-        .setTitle('🎉 Level Up!')
-        .setDescription(`${member} has reached **Level ${level}**!`)
-        .setColor('#2ecc71');
+    const serverId = interaction.guild.id;
+    const topUsers = await getTopUsers(serverId, 0, 10); // Page 1
 
-    await rankChannel.send({ embeds: [embed] });
+    let page = 0;
+    const maxPages = Math.ceil(totalUsers / 10);
 
-    const levelRoles = {
-        5: 'Beginner',
-        10: 'Intermediate',
-        15: 'Advanced',
+    const embed = createRankTopEmbed(topUsers, page, maxPages);
+
+    const message = await interaction.reply({ embeds: [embed], fetchReply: true });
+
+    // Add navigation buttons
+    await message.react('⬅️');
+    await message.react('➡️');
+
+    const filter = (reaction, user) =>
+        ['⬅️', '➡️'].includes(reaction.emoji.name) && user.id === interaction.user.id;
+
+    const collector = message.createReactionCollector({ filter, time: 60000 });
+
+    collector.on('collect', async (reaction) => {
+        if (reaction.emoji.name === '➡️' && page < maxPages - 1) page++;
+        else if (reaction.emoji.name === '⬅️' && page > 0) page--;
+
+        const newTopUsers = await getTopUsers(serverId, page * 10, 10);
+        const newEmbed = createRankTopEmbed(newTopUsers, page, maxPages);
+
+        await message.edit({ embeds: [newEmbed] });
+        await reaction.users.remove(interaction.user.id);
+    });
+});
+
+function createRankTopEmbed(users, page, maxPages) {
+    return {
+        title: `Server Top Call Times (Page ${page + 1}/${maxPages})`,
+        description: users
+            .map((user, index) => `**#${index + 1 + page * 10}** ${user.username} - ${formatTime(user.callTime)}`)
+            .join('\n'),
     };
-
-    if (levelRoles[level]) {
-        const roleName = levelRoles[level];
-        let role = member.guild.roles.cache.find((r) => r.name === roleName);
-
-        if (!role) {
-            role = await member.guild.roles.create({
-                name: roleName,
-                color: 'Random',
-            });
-        }
-
-        await member.roles.add(role);
-    }
 }
 
 /* VOICE XP */
 
-client.on('voiceStateUpdate', async (oldState, newState) => {
-    const { User } = client.models;
-    const member = newState.member || oldState.member;
-    const userId = member.user.id;
-    const guildId = member.guild.id;
-
-    let user = await User.findOne({ where: { userId, guildId } });
-
-    if (!user) {
-        user = await User.create({ userId, guildId });
-    }
-
-    if (!oldState.channelId && newState.channelId) {
-        user.lastVoiceTimestamp = new Date();
-        await user.save();
-    }
-
-    if (oldState.channelId && !newState.channelId) {
-        if (user.lastVoiceTimestamp) {
-            const now = new Date();
-            const timeSpent = Math.floor((now - user.lastVoiceTimestamp) / 1000);
-            user.voiceTime += timeSpent;
-
-            const xpGain = Math.floor(timeSpent / 60) * 10;
-            user.xp += xpGain;
-
-            const xpNeeded = calculateXPNeeded(user.level + 1);
-
-            if (user.xp >= xpNeeded) {
-                user.level += 1;
-                announceLevelUp(member, user.level, client);
-            }
-
-            user.lastVoiceTimestamp = null;
-            await user.save();
-        }
+client.on('voiceStateUpdate', (oldState, newState) => {
+    // Detect when a user starts or stops a call
+    const userId = newState.member.id;
+    const serverId = newState.guild.id;
+    if (!oldState.channel && newState.channel) {
+        // User joined a voice channel: start tracking
+        startCallTracking(userId, serverId);
+    } else if (oldState.channel && !newState.channel) {
+        // User left a voice channel: stop tracking
+        stopCallTracking(userId, serverId);
     }
 });
+
 
 client.on('messageReactionAdd', async (reaction, user) => {
     console.log('Reaction added:', reaction.emoji.name, 'by', user.tag);
